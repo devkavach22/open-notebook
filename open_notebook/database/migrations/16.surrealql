@@ -1,0 +1,29 @@
+-- Migration 16: Create users table with authentication
+-- This creates a table to store user accounts
+
+DEFINE TABLE users SCHEMAFULL;
+
+-- Define fields for the users table
+DEFINE FIELD username ON users TYPE string ASSERT $value != NONE;
+DEFINE FIELD email ON users TYPE string ASSERT $value != NONE;
+DEFINE FIELD password_hash ON users TYPE string ASSERT $value != NONE;
+DEFINE FIELD created_at ON users TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated_at ON users TYPE datetime DEFAULT time::now();
+DEFINE FIELD is_active ON users TYPE bool DEFAULT true;
+DEFINE FIELD last_login ON users TYPE option<datetime>;
+
+-- Create unique indexes to prevent duplicate usernames and emails
+DEFINE INDEX unique_username ON users FIELDS username UNIQUE;
+DEFINE INDEX unique_email ON users FIELDS email UNIQUE;
+
+-- Add user_id field to existing tables to link them to users
+DEFINE FIELD user_id ON notebooks TYPE option<record<users>>;
+DEFINE FIELD user_id ON sources TYPE option<record<users>>;
+DEFINE FIELD user_id ON notes TYPE option<record<users>>;
+DEFINE FIELD user_id ON transformations TYPE option<record<users>>;
+DEFINE FIELD user_id ON podcasts TYPE option<record<users>>;
+
+-- Create indexes for faster queries
+DEFINE INDEX user_notebooks ON notebooks FIELDS user_id;
+DEFINE INDEX user_sources ON sources FIELDS user_id;
+DEFINE INDEX user_notes ON notes FIELDS user_id;

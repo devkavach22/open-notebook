@@ -10,6 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from api.routers import auth
+
+
 
 from api.auth import PasswordAuthMiddleware
 from open_notebook.exceptions import (
@@ -35,7 +38,9 @@ from api.routers import (
     models,
     notebooks,
     notes,
+    payment,
     podcasts,
+    pricing,
     search,
     settings,
     source_chat,
@@ -112,8 +117,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
+
+# AUTHENTICATION BYPASSED IN MIDDLEWARE - See api/auth.py
+# Add password authentication middleware (modified to always bypass)
 app.add_middleware(
     PasswordAuthMiddleware,
     excluded_paths=[
@@ -126,6 +132,8 @@ app.add_middleware(
         "/api/config",
     ],
 )
+
+logger.info("🔓 AUTHENTICATION MIDDLEWARE ACTIVE BUT BYPASSED - All endpoints are open")
 
 # Add CORS middleware last (so it processes first)
 app.add_middleware(
@@ -270,10 +278,51 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(source_chat.router, prefix="/api", tags=["source-chat"])
 app.include_router(credentials.router, prefix="/api", tags=["credentials"])
 
+# Include pricing router with error handling
+try:
+    logger.info(f"Pricing router has {len(pricing.router.routes)} routes")
+    for route in pricing.router.routes:
+        if hasattr(route, 'path'):
+            logger.info(f"  Route: {route.path}")
+    app.include_router(pricing.router, prefix="/api", tags=["pricing"])
+    logger.info("✅ Pricing router included successfully")
+    # Verify routes were added
+    pricing_routes = [r for r in app.routes if hasattr(r, 'path') and 'pricing' in r.path]
+    logger.info(f"Total pricing routes in app: {len(pricing_routes)}")
+except Exception as e:
+    logger.error(f"❌ Failed to include pricing router: {e}")
+    logger.exception(e)
+
+# Include payment router
+try:
+    app.include_router(payment.router, prefix="/api", tags=["payment"])
+    logger.info("✅ Payment router included successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to include payment router: {e}")
+    logger.exception(e)
+
 
 @app.get("/")
 async def root():
-    return {"message": "Open Notebook API is running"}
+    return {"message": "Open Notebook API is running", "pricing_test": "v2"}
+
+
+@app.get("/debug/routes")
+async def debug_routes():
+    """Debug endpoint to see all registered routes"""
+    routes_info = []
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            routes_info.append({
+                "path": route.path,
+                "name": getattr(route, 'name', 'N/A'),
+                "methods": list(getattr(route, 'methods', [])),
+            })
+    return {
+        "total_routes": len(routes_info),
+        "pricing_routes": [r for r in routes_info if 'pricing' in r['path']],
+        "all_routes": routes_info
+    }
 
 
 @app.get("/health")

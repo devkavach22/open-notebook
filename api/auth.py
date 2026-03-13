@@ -28,9 +28,14 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
         ]
 
     async def dispatch(self, request: Request, call_next):
+        # AUTHENTICATION BYPASSED - Always skip authentication
+        logger.info(f"🔓 Auth bypassed for {request.url.path}")
+        return await call_next(request)
+        
+        # Original code commented out:
         # Skip authentication if no password is set
-        if not self.password:
-            return await call_next(request)
+        # if not self.password:
+        #     return await call_next(request)
 
         # Skip authentication for excluded paths
         if request.url.path in self.excluded_paths:

@@ -15,7 +15,7 @@ export const apiClient = axios.create({
   withCredentials: false,
 })
 
-// Request interceptor to add base URL and auth header
+// Request interceptor to add base URL and auth token
 apiClient.interceptors.request.use(async (config) => {
   // Set the base URL dynamically from runtime config
   if (!config.baseURL) {
@@ -23,12 +23,13 @@ apiClient.interceptors.request.use(async (config) => {
     config.baseURL = `${apiUrl}/api`
   }
 
+  // Add authentication token if available
   if (typeof window !== 'undefined') {
     const authStorage = localStorage.getItem('auth-storage')
     if (authStorage) {
       try {
         const { state } = JSON.parse(authStorage)
-        if (state?.token) {
+        if (state?.token && state.token !== 'not-required') {
           config.headers.Authorization = `Bearer ${state.token}`
         }
       } catch (error) {
@@ -52,11 +53,15 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
+    // Handle 401 Unauthorized - redirect to login
     if (error.response?.status === 401) {
       // Clear auth and redirect to login
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-storage')
-        window.location.href = '/login'
+        // Only redirect if not already on login/signup page
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+          window.location.href = '/login'
+        }
       }
     }
     return Promise.reject(error)

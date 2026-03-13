@@ -1,10 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { getApiUrl } from '@/lib/config'
+import { authApi, type SignupData, type LoginData } from '@/lib/api/auth'
+import type { User } from '@/lib/types/auth'
 
 interface AuthState {
   isAuthenticated: boolean
   token: string | null
+  user: User | null
   isLoading: boolean
   error: string | null
   lastAuthCheck: number | null
@@ -13,7 +16,8 @@ interface AuthState {
   authRequired: boolean | null
   setHasHydrated: (state: boolean) => void
   checkAuthRequired: () => Promise<boolean>
-  login: (password: string) => Promise<boolean>
+  login: (credentials: LoginData) => Promise<boolean>
+  signup: (credentials: SignupData) => Promise<boolean>
   logout: () => void
   checkAuth: () => Promise<boolean>
 }
@@ -23,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       isAuthenticated: false,
       token: null,
+      user: null,
       isLoading: false,
       error: null,
       lastAuthCheck: null,
@@ -36,16 +41,7 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuthRequired: async () => {
         try {
-          const apiUrl = await getApiUrl()
-          const response = await fetch(`${apiUrl}/api/auth/status`, {
-            cache: 'no-store',
-          })
-
-          if (!response.ok) {
-            throw new Error(`Auth status check failed: ${response.status}`)
-          }
-
-          const data = await response.json()
+          const data = await authApi.checkAuthStatus()
           const required = data.auth_enabled || false
           set({ authRequired: required })
 
@@ -62,78 +58,100 @@ export const useAuthStore = create<AuthState>()(
           if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
             set({
               error: 'Unable to connect to server. Please check if the API is running.',
-              authRequired: null  // Don't assume auth is required if we can't connect
+              authRequired: null
             })
           } else {
             // For other errors, default to requiring auth to be safe
             set({ authRequired: true })
           }
 
-          // Re-throw the error so the UI can handle it
           throw error
         }
       },
 
-      login: async (password: string) => {
+      signup: async (credentials: SignupData) => {
         set({ isLoading: true, error: null })
         try {
-          const apiUrl = await getApiUrl()
-
-          // Test auth with notebooks endpoint
-          const response = await fetch(`${apiUrl}/api/notebooks`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${password}`,
-              'Content-Type': 'application/json'
-            }
+          const response = await authApi.signup(credentials)
+          
+          set({ 
+            isAuthenticated: true, 
+            token: response.access_token,
+            user: response.user,
+            isLoading: false,
+            lastAuthCheck: Date.now(),
+            error: null
           })
+          return true
+        } catch (error: any) {
+          console.error('Signup error:', error)
+          let errorMessage = 'Signup failed'
           
-          if (response.ok) {
-            set({ 
-              isAuthenticated: true, 
-              token: password, 
-              isLoading: false,
-              lastAuthCheck: Date.now(),
-              error: null
-            })
-            return true
-          } else {
-            let errorMessage = 'Authentication failed'
-            if (response.status === 401) {
-              errorMessage = 'Invalid password. Please try again.'
-            } else if (response.status === 403) {
-              errorMessage = 'Access denied. Please check your credentials.'
-            } else if (response.status >= 500) {
-              errorMessage = 'Server error. Please try again later.'
-            } else {
-              errorMessage = `Authentication failed (${response.status})`
+          if (error.response?.data?.detail) {
+            if (typeof error.response.data.detail === 'string') {
+              errorMessage = error.response.data.detail
+            } else if (Array.isArray(error.response.data.detail)) {
+              errorMessage = error.response.data.detail.map((e: any) => e.msg).join(', ')
             }
-            
-            set({ 
-              error: errorMessage,
-              isLoading: false,
-              isAuthenticated: false,
-              token: null
-            })
-            return false
-          }
-        } catch (error) {
-          console.error('Network error during auth:', error)
-          let errorMessage = 'Authentication failed'
-          
-          if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-            errorMessage = 'Unable to connect to server. Please check if the API is running.'
-          } else if (error instanceof Error) {
-            errorMessage = `Network error: ${error.message}`
-          } else {
-            errorMessage = 'An unexpected error occurred during authentication'
+          } else if (error.response?.status === 400) {
+            errorMessage = 'Invalid signup data. Please check your inputs.'
+          } else if (error.response?.status >= 500) {
+            errorMessage = 'Server error. Please try again later.'
+          } else if (error.message) {
+            errorMessage = error.message
           }
           
           set({ 
             error: errorMessage,
             isLoading: false,
             isAuthenticated: false,
-            token: null
+            token: null,
+            user: null
+          })
+          return false
+        }
+      },
+
+      login: async (credentials: LoginData) => {
+        set({ isLoading: true, error: null })
+        try {
+          const response = await authApi.login(credentials)
+          
+          set({ 
+            isAuthenticated: true, 
+            token: response.access_token,
+            user: response.user,
+            isLoading: false,
+            lastAuthCheck: Date.now(),
+            error: null
+          })
+          return true
+        } catch (error: any) {
+          console.error('Login error:', error)
+          let errorMessage = 'Login failed'
+          
+          if (error.response?.data?.detail) {
+            if (typeof error.response.data.detail === 'string') {
+              errorMessage = error.response.data.detail
+            } else if (Array.isArray(error.response.data.detail)) {
+              errorMessage = error.response.data.detail.map((e: any) => e.msg).join(', ')
+            }
+          } else if (error.response?.status === 401) {
+            errorMessage = 'Invalid username or password'
+          } else if (error.response?.status === 403) {
+            errorMessage = 'Account is disabled'
+          } else if (error.response?.status >= 500) {
+            errorMessage = 'Server error. Please try again later.'
+          } else if (error.message) {
+            errorMessage = error.message
+          }
+          
+          set({ 
+            error: errorMessage,
+            isLoading: false,
+            isAuthenticated: false,
+            token: null,
+            user: null
           })
           return false
         }
@@ -142,7 +160,8 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         set({ 
           isAuthenticated: false, 
-          token: null, 
+          token: null,
+          user: null,
           error: null 
         })
       },
@@ -191,6 +210,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               isAuthenticated: false,
               token: null,
+              user: null,
               lastAuthCheck: null,
               isCheckingAuth: false
             })
@@ -201,6 +221,7 @@ export const useAuthStore = create<AuthState>()(
           set({ 
             isAuthenticated: false, 
             token: null,
+            user: null,
             lastAuthCheck: null,
             isCheckingAuth: false 
           })
@@ -212,6 +233,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         token: state.token,
+        user: state.user,
         isAuthenticated: state.isAuthenticated
       }),
       onRehydrateStorage: () => (state) => {

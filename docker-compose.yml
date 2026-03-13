@@ -13,7 +13,8 @@ services:
     pull_policy: always
 
   open_notebook:
-    image: lfnovo/open_notebook:v1-latest
+    image: my-open-notebook:latest  # Custom built image with pricing feature
+    # To use official image instead: lfnovo/open_notebook:v1-latest
     ports:
       - "8502:8502"  # Web UI
       - "5055:5055"  # REST API
@@ -21,6 +22,10 @@ services:
       # REQUIRED: Change this to your own secret string
       # This encrypts your API keys in the database
       - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+
+      # Razorpay Payment Gateway
+      - RAZORPAY_KEY_ID=rzp_test_SKgLsCXlMbmxsZ
+      - RAZORPAY_KEY_SECRET=k2JD6plNjC8tXX4XTTrNZ3B7
 
       # Database connection (default values - no need to change)
       - SURREAL_URL=ws://surrealdb:8000/rpc
@@ -30,7 +35,9 @@ services:
       - SURREAL_DATABASE=open_notebook
     volumes:
       - ./notebook_data:/app/data
+      - ./api:/app/api
+      - ./open_notebook:/app/open_notebook
     depends_on:
       - surrealdb
     restart: always
-    pull_policy: always
+    pull_policy: never

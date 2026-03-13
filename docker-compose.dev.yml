@@ -1,0 +1,36 @@
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    user: root
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    restart: always
+
+  open_notebook:
+    image: my-open-notebook:latest
+    ports:
+      - "8502:8502"  # Web UI
+      - "5055:5055"  # REST API
+    environment:
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+      - RAZORPAY_KEY_ID=rzp_test_SKgLsCXlMbmxsZ
+      - RAZORPAY_KEY_SECRET=k2JD6plNjC8tXX4XTTrNZ3B7
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=root
+      - SURREAL_PASSWORD=root
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+    volumes:
+      - ./notebook_data:/app/data
+      # DEVELOPMENT: Mount code folders so changes apply immediately
+      - ./api:/app/api
+      - ./open_notebook:/app/open_notebook
+      - ./commands:/app/commands
+    depends_on:
+      - surrealdb
+    restart: always

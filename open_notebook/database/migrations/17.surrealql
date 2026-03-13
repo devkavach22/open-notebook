@@ -1,0 +1,17 @@
+-- Migration 17: Add user_id field to all main tables for multi-user support
+
+-- Add user_id field to notebook table
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE notebook TYPE option<record<users>>;
+DEFINE INDEX IF NOT EXISTS idx_notebook_user ON TABLE notebook COLUMNS user_id;
+
+-- Add user_id field to source table
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE source TYPE option<record<users>>;
+DEFINE INDEX IF NOT EXISTS idx_source_user ON TABLE source COLUMNS user_id;
+
+-- Add user_id field to note table
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE note TYPE option<record<users>>;
+DEFINE INDEX IF NOT EXISTS idx_note_user ON TABLE note COLUMNS user_id;
+
+-- Add user_id field to podcast_config table
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE podcast_config TYPE option<record<users>>;
+DEFINE INDEX IF NOT EXISTS idx_podcast_config_user ON TABLE podcast_config COLUMNS user_id;

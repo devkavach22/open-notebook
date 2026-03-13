@@ -1,0 +1,74 @@
+-- Payment Integration Tables for Razorpay
+-- Migration 15: Payment Methods, Transactions, Invoices, Refunds
+
+-- Payment Methods Table
+DEFINE TABLE payment_method SCHEMAFULL;
+DEFINE FIELD user_id ON payment_method TYPE string;
+DEFINE FIELD razorpay_customer_id ON payment_method TYPE option<string>;
+DEFINE FIELD type ON payment_method TYPE string; -- 'card', 'upi', 'netbanking', 'wallet'
+DEFINE FIELD card_brand ON payment_method TYPE option<string>; -- 'visa', 'mastercard', 'rupay'
+DEFINE FIELD card_last4 ON payment_method TYPE option<string>;
+DEFINE FIELD upi_id ON payment_method TYPE option<string>;
+DEFINE FIELD wallet_name ON payment_method TYPE option<string>; -- 'paytm', 'phonepe', 'googlepay'
+DEFINE FIELD is_default ON payment_method TYPE bool DEFAULT false;
+DEFINE FIELD created ON payment_method TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON payment_method TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX payment_method_user_idx ON payment_method FIELDS user_id;
+
+-- Transactions Table
+DEFINE TABLE transaction SCHEMAFULL;
+DEFINE FIELD user_id ON transaction TYPE string;
+DEFINE FIELD subscription_id ON transaction TYPE option<string>;
+DEFINE FIELD amount ON transaction TYPE float;
+DEFINE FIELD currency ON transaction TYPE string DEFAULT 'INR';
+DEFINE FIELD status ON transaction TYPE string; -- 'created', 'authorized', 'captured', 'failed', 'refunded'
+DEFINE FIELD razorpay_order_id ON transaction TYPE option<string>;
+DEFINE FIELD razorpay_payment_id ON transaction TYPE option<string>;
+DEFINE FIELD razorpay_signature ON transaction TYPE option<string>;
+DEFINE FIELD payment_method ON transaction TYPE option<string>; -- 'card', 'upi', 'netbanking', 'wallet'
+DEFINE FIELD description ON transaction TYPE string;
+DEFINE FIELD metadata ON transaction TYPE option<object>;
+DEFINE FIELD created ON transaction TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON transaction TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX transaction_user_idx ON transaction FIELDS user_id;
+DEFINE INDEX transaction_status_idx ON transaction FIELDS status;
+DEFINE INDEX transaction_razorpay_order_idx ON transaction FIELDS razorpay_order_id;
+
+-- Invoices Table
+DEFINE TABLE invoice SCHEMAFULL;
+DEFINE FIELD user_id ON invoice TYPE string;
+DEFINE FIELD subscription_id ON invoice TYPE option<string>;
+DEFINE FIELD transaction_id ON invoice TYPE option<string>;
+DEFINE FIELD invoice_number ON invoice TYPE string;
+DEFINE FIELD amount ON invoice TYPE float;
+DEFINE FIELD currency ON invoice TYPE string DEFAULT 'INR';
+DEFINE FIELD tax_amount ON invoice TYPE float DEFAULT 0.0; -- GST amount
+DEFINE FIELD status ON invoice TYPE string; -- 'draft', 'issued', 'paid', 'cancelled'
+DEFINE FIELD due_date ON invoice TYPE datetime;
+DEFINE FIELD paid_date ON invoice TYPE option<datetime>;
+DEFINE FIELD line_items ON invoice TYPE array;
+DEFINE FIELD pdf_url ON invoice TYPE option<string>;
+DEFINE FIELD razorpay_invoice_id ON invoice TYPE option<string>;
+DEFINE FIELD created ON invoice TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON invoice TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX invoice_user_idx ON invoice FIELDS user_id;
+DEFINE INDEX invoice_number_idx ON invoice FIELDS invoice_number UNIQUE;
+
+-- Refunds Table
+DEFINE TABLE refund SCHEMAFULL;
+DEFINE FIELD transaction_id ON refund TYPE string;
+DEFINE FIELD user_id ON refund TYPE string;
+DEFINE FIELD amount ON refund TYPE float;
+DEFINE FIELD currency ON refund TYPE string DEFAULT 'INR';
+DEFINE FIELD reason ON refund TYPE string;
+DEFINE FIELD status ON refund TYPE string; -- 'pending', 'processed', 'failed'
+DEFINE FIELD razorpay_refund_id ON refund TYPE option<string>;
+DEFINE FIELD speed ON refund TYPE string DEFAULT 'normal'; -- 'normal' or 'optimum'
+DEFINE FIELD created ON refund TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON refund TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX refund_transaction_idx ON refund FIELDS transaction_id;
+DEFINE INDEX refund_user_idx ON refund FIELDS user_id;

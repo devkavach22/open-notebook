@@ -1,0 +1,8 @@
+-- Migration 18 Rollback: Remove password reset fields from users table
+
+-- Remove index
+REMOVE INDEX IF EXISTS idx_users_reset_token ON TABLE users;
+
+-- Remove fields
+REMOVE FIELD IF EXISTS reset_token ON TABLE users;
+REMOVE FIELD IF EXISTS reset_token_expires ON TABLE users;

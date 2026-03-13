@@ -67,6 +67,8 @@ import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { SourceInsightDialog } from '@/components/source/SourceInsightDialog'
 import { NotebookAssociations } from '@/components/source/NotebookAssociations'
+import { MindMapDialog } from '@/components/sources/MindMapDialog'
+import { Brain } from 'lucide-react'
 
 interface SourceDetailContentProps {
   sourceId: string
@@ -98,6 +100,7 @@ export function SourceDetailContent({
   const [selectedInsight, setSelectedInsight] = useState<SourceInsightResponse | null>(null)
   const [insightToDelete, setInsightToDelete] = useState<string | null>(null)
   const [deletingInsight, setDeletingInsight] = useState(false)
+  const [showMindMap, setShowMindMap] = useState(false)
 
   const fetchSource = useCallback(async () => {
     try {
@@ -469,7 +472,10 @@ export function SourceDetailContent({
             <TabsTrigger value="insights">
               {t.common.insights} {insights.length > 0 && `(${insights.length})`}
             </TabsTrigger>
-            <TabsTrigger value="details">{t.sources.details}</TabsTrigger>
+            <TabsTrigger value="mindmap">
+              <Brain className="h-4 w-4 mr-1" />
+              Mind Map
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="content" className="mt-6">
@@ -658,159 +664,42 @@ export function SourceDetailContent({
             </Card>
           </TabsContent>
 
-          <TabsContent value="details" className="mt-6">
+          <TabsContent value="mindmap" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>{t.sources.details}</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Mind Map
+                </CardTitle>
+                <CardDescription>
+                  Visual representation of the source content structure and key concepts
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Embedding Alert */}
-                {!source.embedded && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>
-                      {t.sources.notEmbeddedAlert}
-                    </AlertTitle>
-                    <AlertDescription>
-                      {t.sources.notEmbeddedDesc}
-                      <div className="mt-3">
-                        <Button
-                          onClick={handleEmbedContent}
-                          disabled={isEmbedding}
-                          size="sm"
-                        >
-                          <Database className="mr-2 h-4 w-4" />
-                          {isEmbedding ? t.sources.embedding : t.sources.embedContent}
-                        </Button>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Source Information */}
-                <div className="space-y-4">
-                  {source.asset?.url && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold">{t.common.url}</h3>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 rounded bg-muted px-2 py-1 text-sm">
-                          {source.asset.url}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCopyUrl}
-                        >
-                          {copied ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleOpenExternal}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {source.asset?.file_path && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold">{t.sources.uploadedFile}</h3>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <code className="rounded bg-muted px-2 py-1 text-sm">
-                          {source.asset.file_path}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleDownloadFile}
-                          disabled={isDownloadingFile || fileAvailable === false}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          {fileAvailable === false
-                            ? t.sources.fileUnavailable
-                            : isDownloadingFile
-                              ? t.sources.preparing
-                              : t.common.download}
-                        </Button>
-                      </div>
-                      {fileAvailable === false ? (
-                        <p className="text-xs text-muted-foreground">
-                          {t.sources.fileUnavailableDesc}
-                        </p>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {source.topics && source.topics.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold">{t.sources.topics}</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {source.topics.map((topic, idx) => (
-                          <Badge key={idx} variant="outline">
-                            {topic}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Metadata */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold">{t.sources.metadata}</h3>
-                    <div className="flex items-center gap-2">
-                      <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                      <Badge variant={source.embedded ? "default" : "secondary"} className="text-xs">
-                        {source.embedded ? t.sources.embedded : t.sources.notEmbedded}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">{t.common.created_label}</p>
-                      <p className="text-sm">
-                        {formatDistanceToNow(new Date(source.created), {
-                          addSuffix: true,
-                          locale: getDateLocale(language)
-                        })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(source.created).toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">{t.common.updated_label}</p>
-                      <p className="text-sm">
-                        {formatDistanceToNow(new Date(source.updated), {
-                          addSuffix: true,
-                          locale: getDateLocale(language)
-                        })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(source.updated).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
+              <CardContent>
+                <div className="flex items-center justify-center py-12">
+                  <Button 
+                    onClick={() => setShowMindMap(true)}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <Brain className="h-5 w-5" />
+                    Generate Mind Map
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Notebook Associations */}
-            <NotebookAssociations
-              sourceId={sourceId}
-              currentNotebookIds={source.notebooks || []}
-              onSave={fetchSource}
-            />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Mind Map Dialog */}
+      <MindMapDialog
+        open={showMindMap}
+        onOpenChange={setShowMindMap}
+        sourceId={sourceId}
+        sourceName={source?.title || 'Untitled Source'}
+        mode="source"
+      />
 
       <SourceInsightDialog
         open={Boolean(selectedInsight)}

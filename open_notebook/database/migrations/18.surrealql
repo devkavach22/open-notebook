@@ -1,0 +1,10 @@
+-- Migration 18: Add password reset fields to users table
+
+-- Add reset_token field to users table
+DEFINE FIELD IF NOT EXISTS reset_token ON TABLE users TYPE option<string>;
+
+-- Add reset_token_expires field to users table
+DEFINE FIELD IF NOT EXISTS reset_token_expires ON TABLE users TYPE option<datetime>;
+
+-- Create index for faster reset token lookups
+DEFINE INDEX IF NOT EXISTS idx_users_reset_token ON TABLE users COLUMNS reset_token;

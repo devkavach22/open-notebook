@@ -1,4 +1,5 @@
 import operator
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from content_core import extract_content
@@ -75,7 +76,145 @@ async def content_process(state: SourceState) -> dict:
         logger.warning(f"Failed to retrieve speech-to-text model configuration: {e}")
         # Continue without custom audio model (content-core will use its default)
 
-    processed_state = await extract_content(content_state)
+    # Check if we need to handle legacy Office files or archives before content-core processing
+    file_path = content_state.get("file_path")
+    
+    if file_path:
+        from open_notebook.processors.doc_processor import is_doc_file
+        from open_notebook.processors.office_processor import is_legacy_office_file
+        from open_notebook.processors.archive_processor import is_archive_file
+        
+        # Handle legacy .doc files
+        if is_doc_file(file_path):
+            try:
+                from open_notebook.processors.doc_processor import extract_text_from_doc
+                
+                logger.info("Detected legacy .doc file, using custom processor")
+                doc_text = extract_text_from_doc(file_path)
+                
+                from content_core.common import ProcessSourceState
+                processed_state = ProcessSourceState(
+                    content=doc_text,
+                    url=None,
+                    file_path=file_path,
+                    title=Path(file_path).stem
+                )
+                logger.info(f"Extracted {len(doc_text)} characters from .doc file")
+                
+            except ImportError as e:
+                logger.error(f".doc processor not available: {e}")
+                raise ValueError(
+                    "Unable to process .doc file. Please install antiword. "
+                    "Run: apt-get install antiword (Linux) or brew install antiword (Mac)"
+                )
+            except Exception as e:
+                logger.error(f".doc processing failed: {e}")
+                raise ValueError(f"Failed to extract text from .doc file: {str(e)}")
+        
+        # Handle legacy Office files (.ppt, .xls)
+        elif is_legacy_office_file(file_path):
+            try:
+                from open_notebook.processors.office_processor import extract_text_from_ppt, extract_text_from_xls
+                
+                office_type = is_legacy_office_file(file_path)
+                logger.info(f"Detected legacy .{office_type} file, using custom processor")
+                
+                if office_type == 'ppt':
+                    office_text = extract_text_from_ppt(file_path)
+                else:  # xls
+                    office_text = extract_text_from_xls(file_path)
+                
+                from content_core.common import ProcessSourceState
+                processed_state = ProcessSourceState(
+                    content=office_text,
+                    url=None,
+                    file_path=file_path,
+                    title=Path(file_path).stem
+                )
+                logger.info(f"Extracted {len(office_text)} characters from .{office_type} file")
+                
+            except ImportError as e:
+                logger.error(f"Office processor not available: {e}")
+                raise ValueError(
+                    f"Unable to process .{office_type} file. Please install catdoc. "
+                    "Run: apt-get install catdoc (Linux) or brew install catdoc (Mac)"
+                )
+            except Exception as e:
+                logger.error(f"Office file processing failed: {e}")
+                raise ValueError(f"Failed to extract text from Office file: {str(e)}")
+        
+        # Handle archive files (.zip, .tar, .gz)
+        elif is_archive_file(file_path):
+            try:
+                from open_notebook.processors.archive_processor import (
+                    extract_archive, cleanup_temp_dir, get_processable_files
+                )
+                
+                logger.info("Detected archive file, extracting contents")
+                temp_dir, extracted_files = extract_archive(file_path)
+                
+                try:
+                    # Filter to processable files
+                    processable_files = get_processable_files(extracted_files)
+                    
+                    if not processable_files:
+                        raise ValueError("No processable documents found in archive")
+                    
+                    # Process each file and combine content
+                    combined_content = []
+                    for extracted_file in processable_files[:20]:  # Limit to first 20 files
+                        try:
+                            file_content_state = {"file_path": extracted_file}
+                            file_processed = await extract_content(file_content_state)
+                            if file_processed.content:
+                                combined_content.append(
+                                    f"\n\n--- {Path(extracted_file).name} ---\n\n{file_processed.content}"
+                                )
+                        except Exception as e:
+                            logger.warning(f"Failed to process {extracted_file}: {e}")
+                    
+                    if not combined_content:
+                        raise ValueError("Failed to extract content from any files in archive")
+                    
+                    from content_core.common import ProcessSourceState
+                    processed_state = ProcessSourceState(
+                        content="\n".join(combined_content),
+                        url=None,
+                        file_path=file_path,
+                        title=f"{Path(file_path).stem} (Archive - {len(combined_content)} files)"
+                    )
+                    logger.info(f"Extracted content from {len(combined_content)} files in archive")
+                    
+                finally:
+                    # Always clean up temp directory
+                    cleanup_temp_dir(temp_dir)
+                    
+            except Exception as e:
+                logger.error(f"Archive processing failed: {e}")
+                raise ValueError(f"Failed to process archive: {str(e)}")
+        
+        else:
+            # Use content-core for all other file types
+            processed_state = await extract_content(content_state)
+    else:
+        # No file path, use content-core (URL or text content)
+        processed_state = await extract_content(content_state)
+
+    # Check if we need to use Tesseract OCR for scanned PDFs
+    if content_state.get("file_path") and content_state["file_path"].lower().endswith(".pdf"):
+        try:
+            from open_notebook.processors.tesseract_pdf import should_use_ocr, extract_text_from_scanned_pdf
+            
+            if should_use_ocr(content_state["file_path"], processed_state.content):
+                logger.info("PDF appears to be scanned, using Tesseract OCR")
+                ocr_text = extract_text_from_scanned_pdf(content_state["file_path"])
+                if ocr_text and len(ocr_text.strip()) > len(processed_state.content or ""):
+                    logger.info(f"Tesseract extracted {len(ocr_text)} chars vs {len(processed_state.content or '')} from standard extraction")
+                    processed_state.content = ocr_text
+        except ImportError:
+            logger.warning("Tesseract OCR not available, install pytesseract and pdf2image")
+        except Exception as e:
+            logger.warning(f"Tesseract OCR failed, using standard extraction: {e}")
 
     if not processed_state.content or not processed_state.content.strip():
         url = processed_state.url or ""

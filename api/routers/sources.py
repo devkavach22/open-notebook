@@ -1017,3 +1017,162 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
         raise HTTPException(
             status_code=500, detail=f"Error starting insight generation: {str(e)}"
         )
+
+
+# ==================== MIND MAP ENDPOINT ====================
+
+from pydantic import BaseModel
+from typing import Optional, List as ListType
+
+class MindMapNode(BaseModel):
+    """Mind map node structure."""
+    id: str
+    label: str
+    type: str  # 'root', 'main', 'sub', 'detail'
+    children: Optional[ListType['MindMapNode']] = None
+
+class SourceMindMapResponse(BaseModel):
+    """Source mind map response."""
+    source_id: str
+    source_title: str
+    root: MindMapNode
+
+# Update forward refs for nested model
+MindMapNode.model_rebuild()
+
+
+@router.post("/sources/{source_id}/mindmap", response_model=SourceMindMapResponse)
+async def generate_source_mindmap(source_id: str):
+    """Generate an AI-powered mind map from a single source."""
+    try:
+        logger.info("=" * 80)
+        logger.info(f"SOURCE MINDMAP: Starting AI mind map generation for source {source_id}")
+        
+        # Get source with full_text
+        source = await Source.get(source_id)
+        if not source:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        logger.info(f"SOURCE MINDMAP: Found source '{source.title}'")
+        
+        # Check if source has content
+        if not source.full_text or len(source.full_text.strip()) == 0:
+            logger.warning(f"SOURCE MINDMAP: No content for source '{source.title}'")
+            return SourceMindMapResponse(
+                source_id=source_id,
+                source_title=source.title or "Untitled",
+                root=MindMapNode(
+                    id="root",
+                    label=source.title or "Untitled",
+                    type="root",
+                    children=[MindMapNode(
+                        id="no_content",
+                        label="No content available",
+                        type="main",
+                        children=None
+                    )]
+                )
+            )
+        
+        logger.info(f"SOURCE MINDMAP: Source has {len(source.full_text)} characters")
+        
+        # Import AI mind map engine
+        from open_notebook.utils.mindmap_engine import MindMapEngine
+        from open_notebook.ai.provision import provision_langchain_model
+        
+        # Try to load LLM for AI-powered mind map
+        try:
+            llm = await provision_langchain_model(
+                content=source.full_text,  # Pass the content
+                model_id=None,  # Use default
+                default_type="chat",
+                temperature=0.3,  # Lower temperature for more focused, deterministic output
+                num_ctx=8192  # Increase context window for Ollama models
+            )
+            engine = MindMapEngine(llm=llm)
+            logger.info("✅ Using AI-powered mind map generation with enhanced parameters")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load LLM, using rule-based fallback: {e}")
+            engine = MindMapEngine(llm=None)
+        
+        # Generate AI mind map
+        try:
+            ai_mindmap = engine.generate_mind_map(
+                full_text=source.full_text,
+                title=source.title
+            )
+            
+            # Convert AI mind map to our node structure
+            import hashlib
+            node_counter = {"count": 0}  # Mutable counter for unique IDs
+            
+            def convert_to_nodes(data: dict, parent_id: str, level: int = 0) -> MindMapNode:
+                """Recursively convert AI mind map to MindMapNode structure"""
+                node_type = "main" if level == 0 else "sub" if level == 1 else "detail"
+                
+                # Generate unique ID using hash of label + counter
+                node_counter["count"] += 1
+                label_hash = hashlib.md5(data['label'].encode()).hexdigest()[:8]
+                node_id = f"{parent_id}_{label_hash}_{node_counter['count']}"
+                
+                children = [
+                    convert_to_nodes(child, node_id, level + 1)
+                    for child in data.get("children", [])
+                ] if data.get("children") else None
+                
+                return MindMapNode(
+                    id=node_id,
+                    label=data["label"],
+                    type=node_type,
+                    children=children
+                )
+            
+            # Create root node with AI-generated children
+            root = MindMapNode(
+                id="root",
+                label=ai_mindmap.get("label", source.title or "Untitled"),
+                type="root",
+                children=[
+                    convert_to_nodes(child, "root", level=0)
+                    for child in ai_mindmap.get("children", [])
+                ] if ai_mindmap.get("children") else None
+            )
+            
+            logger.info(f"✅ Generated AI mind map for '{source.title}' with {len(ai_mindmap.get('children', []))} categories")
+            logger.info("=" * 80)
+            
+            return SourceMindMapResponse(
+                source_id=source_id,
+                source_title=source.title or "Untitled",
+                root=root
+            )
+            
+        except Exception as e:
+            logger.error(f"SOURCE MINDMAP: Error generating AI mind map: {e}")
+            # Fallback to simple preview
+            preview = source.full_text[:200].replace('\n', ' ')
+            return SourceMindMapResponse(
+                source_id=source_id,
+                source_title=source.title or "Untitled",
+                root=MindMapNode(
+                    id="root",
+                    label=source.title or "Untitled",
+                    type="root",
+                    children=[MindMapNode(
+                        id="content_preview",
+                        label=preview,
+                        type="main",
+                        children=None
+                    )]
+                )
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"SOURCE MINDMAP: Fatal error generating mind map: {e}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate mind map: {str(e)}"
+        )

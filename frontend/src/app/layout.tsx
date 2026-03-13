@@ -25,6 +25,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Razorpay Checkout Script */}
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
       </head>
       <body className={inter.className}>
         <ErrorBoundary>

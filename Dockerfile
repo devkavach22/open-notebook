@@ -6,14 +6,23 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install system dependencies required for building certain Python packages
 # Add Node.js 20.x LTS for building frontend
-# NOTE: gcc/g++/make removed - uv should download pre-built wheels. Add back if build fails.
 # NOTE: gcc/g++/make required for some python dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
+    antiword \
+    unrtf \
+    poppler-utils \
+    tesseract-ocr \
+    ffmpeg \
+    catdoc \
+    libxml2-dev \
+    libxslt1-dev \
+    python3-dev \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Set build optimization environment variables
 ENV MAKEFLAGS="-j$(nproc)"
@@ -30,7 +39,8 @@ COPY pyproject.toml uv.lock ./
 COPY open_notebook/__init__.py ./open_notebook/__init__.py
 
 # Install dependencies with optimizations (this layer will be cached unless dependencies change)
-RUN uv sync --frozen --no-dev
+# Note: Removed --frozen to allow adding razorpay from pyproject.toml
+RUN uv sync --no-dev
 
 # Copy the rest of the application code
 COPY . /app
@@ -52,10 +62,17 @@ FROM python:3.12-slim-bookworm AS runtime
 
 # Install only runtime system dependencies (no build tools)
 # Add Node.js 20.x LTS for running frontend
+# Add antiword for legacy .doc file support
+# Add catdoc for legacy .ppt and .xls file support
+# Add tesseract-ocr and poppler-utils for PDF OCR support
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ffmpeg \
     supervisor \
     curl \
+    antiword \
+    catdoc \
+    tesseract-ocr \
+    poppler-utils \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*

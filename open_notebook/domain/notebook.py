@@ -18,6 +18,7 @@ class Notebook(ObjectModel):
     name: str
     description: str
     archived: Optional[bool] = False
+    user_id: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -25,6 +26,16 @@ class Notebook(ObjectModel):
         if not v.strip():
             raise InvalidInputError("Notebook name cannot be empty")
         return v
+
+    def _prepare_save_data(self) -> Dict[str, Any]:
+        """Override to ensure user_id is converted to RecordID format"""
+        data = super()._prepare_save_data()
+        
+        # Convert user_id string to RecordID format if present
+        if data.get("user_id") is not None:
+            data["user_id"] = ensure_record_id(data["user_id"])
+        
+        return data
 
     async def get_sources(self) -> List["Source"]:
         try:
@@ -678,3 +689,30 @@ async def vector_search(
         logger.error(f"Error performing vector search: {str(e)}")
         logger.exception(e)
         raise DatabaseOperationError(e)
+
+
+
+# Mind Map endpoint
+from pydantic import BaseModel
+from typing import List, Optional
+
+
+class MindMapNode(BaseModel):
+    """Mind map node structure."""
+    id: str
+    label: str
+    type: str  # 'root', 'main', 'sub'
+    children: Optional[List['MindMapNode']] = None
+
+
+class MindMapResponse(BaseModel):
+    """Mind map response."""
+    notebook_id: str
+    notebook_name: str
+    root: MindMapNode
+
+
+
+
+# Update forward refs for nested model
+MindMapNode.model_rebuild()

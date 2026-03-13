@@ -683,3 +683,79 @@ class NotebookDeleteResponse(BaseModel):
     unlinked_sources: int = Field(
         ..., description="Number of sources unlinked from notebook"
     )
+
+# Pricing Plan models
+class PricingPlanCreate(BaseModel):
+    name: str = Field(..., description="Plan name")
+    price: float = Field(..., description="Plan price")
+    currency: str = Field(default="USD", description="Currency code")
+    period: str = Field(default="month", description="Billing period")
+    description: str = Field(..., description="Plan description")
+    features: List[str] = Field(..., description="List of features")
+    popular: bool = Field(default=False, description="Mark as popular")
+    max_notebooks: Optional[int] = Field(None, description="Maximum notebooks allowed")
+    max_sources: Optional[int] = Field(None, description="Maximum sources allowed")
+
+
+class PricingPlanUpdate(BaseModel):
+    name: Optional[str] = Field(None, description="Plan name")
+    price: Optional[float] = Field(None, description="Plan price")
+    currency: Optional[str] = Field(None, description="Currency code")
+    period: Optional[str] = Field(None, description="Billing period")
+    description: Optional[str] = Field(None, description="Plan description")
+    features: Optional[List[str]] = Field(None, description="List of features")
+    popular: Optional[bool] = Field(None, description="Mark as popular")
+    active: Optional[bool] = Field(None, description="Plan active status")
+    max_notebooks: Optional[int] = Field(None, description="Maximum notebooks allowed")
+    max_sources: Optional[int] = Field(None, description="Maximum sources allowed")
+
+
+class PricingPlanResponse(BaseModel):
+    id: str
+    name: str
+    price: float
+    currency: str
+    period: str
+    description: str
+    features: List[str]
+    popular: bool
+    active: bool
+    max_notebooks: Optional[int]
+    max_sources: Optional[int]
+    created: str
+    updated: str
+    
+    model_config = {"from_attributes": True}
+    
+    @classmethod
+    def model_validate(cls, obj):
+        """Custom validation to handle datetime objects"""
+        if isinstance(obj, dict):
+            # Convert datetime objects to ISO strings
+            for key in ['created', 'updated']:
+                if key in obj and hasattr(obj[key], 'isoformat'):
+                    obj[key] = obj[key].isoformat()
+        return super().model_validate(obj)
+
+
+class SubscribeRequest(BaseModel):
+    plan_id: str = Field(..., description="Pricing plan ID to subscribe to")
+    user_id: str = Field(default="default_user", description="User ID")
+
+
+class SubscriptionResponse(BaseModel):
+    id: str
+    user_id: str
+    plan: str
+    status: str
+    start_date: str
+    end_date: Optional[str]
+    auto_renew: bool
+    created: str
+    updated: str
+
+
+class SubscriptionStatsResponse(BaseModel):
+    total_subscriptions: int
+    active_subscriptions: int
+    cancelled_subscriptions: int

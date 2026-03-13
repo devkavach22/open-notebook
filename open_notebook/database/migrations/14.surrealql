@@ -1,0 +1,71 @@
+-- Migration 14: Create pricing plan and subscription tables
+
+-- Pricing Plan Table
+DEFINE TABLE IF NOT EXISTS pricing_plan SCHEMAFULL;
+
+DEFINE FIELD IF NOT EXISTS name ON TABLE pricing_plan TYPE string;
+DEFINE FIELD IF NOT EXISTS price ON TABLE pricing_plan TYPE float;
+DEFINE FIELD IF NOT EXISTS currency ON TABLE pricing_plan TYPE string DEFAULT 'USD';
+DEFINE FIELD IF NOT EXISTS period ON TABLE pricing_plan TYPE string DEFAULT 'month';
+DEFINE FIELD IF NOT EXISTS description ON TABLE pricing_plan TYPE string;
+DEFINE FIELD IF NOT EXISTS features ON TABLE pricing_plan TYPE array<string>;
+DEFINE FIELD IF NOT EXISTS popular ON TABLE pricing_plan TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS active ON TABLE pricing_plan TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS max_notebooks ON TABLE pricing_plan TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS max_sources ON TABLE pricing_plan TYPE option<int>;
+
+DEFINE FIELD IF NOT EXISTS created ON pricing_plan DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON pricing_plan DEFAULT time::now() VALUE time::now();
+
+-- User Subscription Table
+DEFINE TABLE IF NOT EXISTS user_subscription SCHEMAFULL;
+
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE user_subscription TYPE string;
+DEFINE FIELD IF NOT EXISTS plan ON TABLE user_subscription TYPE record<pricing_plan>;
+DEFINE FIELD IF NOT EXISTS status ON TABLE user_subscription TYPE string DEFAULT 'active';
+DEFINE FIELD IF NOT EXISTS start_date ON TABLE user_subscription TYPE datetime;
+DEFINE FIELD IF NOT EXISTS end_date ON TABLE user_subscription TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS auto_renew ON TABLE user_subscription TYPE bool DEFAULT true;
+
+DEFINE FIELD IF NOT EXISTS created ON user_subscription DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON user_subscription DEFAULT time::now() VALUE time::now();
+
+-- Insert default pricing plans
+INSERT INTO pricing_plan {
+    name: 'Free Plan',
+    price: 0,
+    currency: 'USD',
+    period: 'month',
+    description: 'Perfect for getting started',
+    features: ['5 Notebooks', '10 Sources per notebook', 'Basic AI models', 'Community support'],
+    popular: false,
+    active: true,
+    max_notebooks: 5,
+    max_sources: 10
+};
+
+INSERT INTO pricing_plan {
+    name: 'Pro Plan',
+    price: 19,
+    currency: 'USD',
+    period: 'month',
+    description: 'For power users',
+    features: ['Unlimited Notebooks', 'Unlimited Sources', 'All AI models', 'Priority support', 'Advanced transformations', 'Podcast generation'],
+    popular: true,
+    active: true,
+    max_notebooks: NONE,
+    max_sources: NONE
+};
+
+INSERT INTO pricing_plan {
+    name: 'Enterprise',
+    price: 99,
+    currency: 'USD',
+    period: 'month',
+    description: 'For teams and organizations',
+    features: ['Everything in Pro', 'Team collaboration', 'Custom AI models', 'Dedicated support', 'SSO integration', 'Custom integrations'],
+    popular: false,
+    active: true,
+    max_notebooks: NONE,
+    max_sources: NONE
+};

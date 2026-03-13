@@ -1,0 +1,17 @@
+-- Rollback Migration 15: Remove Payment Tables
+
+-- Remove indexes first
+REMOVE INDEX refund_user_idx ON refund;
+REMOVE INDEX refund_transaction_idx ON refund;
+REMOVE INDEX invoice_number_idx ON invoice;
+REMOVE INDEX invoice_user_idx ON invoice;
+REMOVE INDEX transaction_razorpay_order_idx ON transaction;
+REMOVE INDEX transaction_status_idx ON transaction;
+REMOVE INDEX transaction_user_idx ON transaction;
+REMOVE INDEX payment_method_user_idx ON payment_method;
+
+-- Remove tables
+REMOVE TABLE refund;
+REMOVE TABLE invoice;
+REMOVE TABLE transaction;
+REMOVE TABLE payment_method;

@@ -252,8 +252,11 @@ export function SourceTypeStep({ control, register, setValue, errors, urlValidat
                         {...register('file')}
                         accept=".pdf,.doc,.docx,.pptx,.ppt,.xlsx,.xls,.txt,.md,.epub,.mp4,.avi,.mov,.wmv,.mp3,.wav,.m4a,.aac,.jpg,.jpeg,.png,.tiff,.zip,.tar,.gz,.html"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t.sources.selectMultipleFilesHint}
+                      {/* <p className="text-xs text-muted-foreground mt-1">
+                        {t.sources.supportedFormats || "Supported: Documents (PDF, DOC, DOCX, PPT, XLS, EPUB, TXT, MD), Media (MP4, MP3, WAV, M4A), Images (JPG, PNG), Archives (ZIP)"}
+                      </p> */}
+                         <p className="text-xs text-muted-foreground mt-1">
+                        { "Supported: Documents (PDF, DOC, DOCX, PPTX, XLS, EPUB, TXT, MD), Media (MP4, MP3, WAV, M4A), Images (JPG, PNG), Archives (ZIP)"}
                       </p>
                       {fileCount > 1 && fileInput instanceof FileList && (
                         <div className="mt-2 p-3 bg-muted rounded-md">

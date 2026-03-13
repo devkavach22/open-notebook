@@ -1,0 +1,14 @@
+-- Rollback migration 16
+REMOVE INDEX user_notes ON notes;
+REMOVE INDEX user_sources ON sources;
+REMOVE INDEX user_notebooks ON notebooks;
+
+REMOVE FIELD user_id ON podcasts;
+REMOVE FIELD user_id ON transformations;
+REMOVE FIELD user_id ON notes;
+REMOVE FIELD user_id ON sources;
+REMOVE FIELD user_id ON notebooks;
+
+REMOVE INDEX unique_email ON users;
+REMOVE INDEX unique_username ON users;
+REMOVE TABLE users;
